@@ -1,0 +1,24 @@
+.....................
+WARNING: the benchmark result may be unstable
+* Not enough samples to get a stable result (95% certainly of less than 1% variation)
+
+Try to rerun the benchmark with more runs, values and/or loops.
+Run 'python -m pyperf system tune' command to reduce the system jitter.
+Use pyperf stats, pyperf dump and pyperf hist to analyze results.
+Use --quiet option to hide these warnings.
+
+nbody: Mean +- std dev: 232 ms +- 3 ms
+
+ Performance counter stats for 'python src/nbody/nbody_original.py --iterations 20000':
+
+         124907351      cache-references                                            
+           1462106      cache-misses              #    1.171 % of all cache refs    
+       52197579887      cycles                                                      
+      148645204484      instructions              #    2.85  insn per cycle         
+
+      22.195981079 seconds time elapsed
+
+      21.779838000 seconds user
+       0.244219000 seconds sys
+
+

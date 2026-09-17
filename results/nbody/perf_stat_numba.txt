@@ -1,0 +1,16 @@
+.....................
+nbody: Mean +- std dev: 9.24 ms +- 0.06 ms
+
+ Performance counter stats for 'python src/nbody/nbody_numba.py --iterations 20000':
+
+         710074862      cache-references                                            
+          42440837      cache-misses              #    5.977 % of all cache refs    
+       62442131398      cycles                                                      
+       88794432130      instructions              #    1.42  insn per cycle         
+
+      27.037779591 seconds time elapsed
+
+      25.329176000 seconds user
+       1.248692000 seconds sys
+
+

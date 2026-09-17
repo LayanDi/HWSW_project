@@ -1,0 +1,1 @@
+Mean +- std dev: [baseline] 229 ms +- 3 ms -> [numba] 9.23 ms +- 0.15 ms: 24.84x faster

@@ -1,0 +1,15 @@
+Steady-state mean per loop: 229.975 ms
+
+ Performance counter stats for 'python perf_wrapper_baseline.py':
+
+           5107749      cache-references                                            
+             67156      cache-misses              #    1.315 % of all cache refs    
+       11199867606      cycles                                                      
+       34038669457      instructions              #    3.04  insn per cycle         
+
+       4.712141045 seconds time elapsed
+
+       4.695148000 seconds user
+       0.011987000 seconds sys
+
+

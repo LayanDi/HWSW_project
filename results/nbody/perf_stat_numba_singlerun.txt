@@ -1,0 +1,15 @@
+Steady-state mean per loop: 9.218 ms
+
+ Performance counter stats for 'python perf_wrapper_numba.py':
+
+          34263827      cache-references                                            
+           1935902      cache-misses              #    5.650 % of all cache refs    
+        1981539197      cycles                                                      
+        2525092188      instructions              #    1.27  insn per cycle         
+
+       0.897348537 seconds time elapsed
+
+       0.806012000 seconds user
+       0.083793000 seconds sys
+
+
