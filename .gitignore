@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+perf.data
+perf.data.old
