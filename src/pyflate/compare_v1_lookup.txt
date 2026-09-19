@@ -1,0 +1,1 @@
+Mean +- std dev: [baseline] 1.12 sec +- 0.01 sec -> [v1_lookup] 1.07 sec +- 0.01 sec: 1.05x faster
