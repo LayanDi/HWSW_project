@@ -1,6 +1,5 @@
-# HWSW Project: Benchmark Optimization, Analysis, and Hardware Acceleration
+# HWSW Project
 
-Course: ECE882 (HWSW Co-Design)
 Benchmarks selected: **nbody**, **pyflate**
 
 ## Repository structure
@@ -8,8 +7,12 @@ Benchmarks selected: **nbody**, **pyflate**
 ```
 hwsw-project/
 ├── README.md
+├── prompt.docx
+├── .gitignore
 ├── src/
 │   ├── nbody/
+│       ├── report_nbody.pdf              - report
+│   │   ├── script_nbody.sh               - reproduces every nbody measurement end-to-end
 │   │   ├── software/
 │   │   │   ├── nbody_original.py         - baseline (pyperformance bm_nbody)
 │   │   │   ├── nbody_unrolled.py         - optimization 1: manual loop unrolling
@@ -23,11 +26,14 @@ hwsw-project/
 │   │       ├── nbody_accelerator.sv      - top-level (wires controller + datapath)
 │   │       └── nbody_tb.sv               - testbench (not run through a simulator - see note below)
 │   └── pyflate/
+│       ├── report_pyflate.pdf            - report
+│       ├── script_pyflate.sh             - reproduces every pyflate measurement end-to-end
 │       ├── software/
 │       │   ├── pyflate_original.py       - baseline (pyperformance bm_pyflate, Paul Sladen)
 │       │   ├── pyflate_lookup.py         - optimization 1: O(1) Huffman symbol lookup
 │       │   ├── pyflate_v2_lookup_mtf.py  - optimization 2: + faster move_to_front
 │       │   ├── cprofile_wrapper_baseline.py - single-process cProfile wrapper
+│       │   ├── flamegraph_wrapper.py     - repeats decode N times so py-spy samples well
 │       │   └── data/interpreter.tar.bz2  - benchmark input file (from pyperformance)
 │       └── hardware/
 │           ├── pyflate_datapath.sv       - bit shift-in register, wires lookup + MTF units
@@ -42,54 +48,45 @@ hwsw-project/
     │   ├── baseline.json / unrolled.json / v2_sqrt.json / numba.json   - pyperf raw results
     │   ├── compare_unroll.txt / compare_v2.txt / compare_numba.txt     - pyperf compare_to output
     │   ├── perf_report_nbody.txt                                       - perf report (python3-dbg)
-    │   ├── perf_stat_baseline.txt / perf_stat_numba.txt                 - perf stat (pyperf multi-process run)
+    │   ├── perf_stat_baseline.txt / perf_stat_numba.txt                 - perf stat 
     │   ├── perf_stat_baseline_singlerun.txt / perf_stat_numba_singlerun.txt
     │   │       - perf stat, single-process apples-to-apples comparison (see Methodology notes)
     │   ├── baseline_flame.svg / numba_flame.svg                         - py-spy flame graphs
-    │   ├── optimization_unrolled.txt / run_v2_full_output.txt           - full run output logs
-    │   └── report_nbody.txt                                             - final written report
+    │   └── optimization_unrolled.txt / run_v2_full_output.txt           - full run output logs 
     └── pyflate/
         ├── baseline.json / v1_lookup.json / v2_lookup_mtf.json          - pyperf raw results
         ├── compare_v1_lookup.txt / compare_v2_lookup_mtf.txt            - pyperf compare_to output
         ├── cprofile_baseline.txt / pyflate_profile_baseline.prof        - cProfile output
-        └── report_pyflate.txt                                          - final written report (TODO)
+        └── baseline_flame.svg / v2_lookup_mtf_flame.svg                 - py-spy flame graphs
 ```
+
 
 ## Environment setup
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install pyperf numpy numba
+pip install pyperf numpy numba py-spy
 ```
 
-A SystemVerilog simulator (e.g. `apt install iverilog`) is only needed if
-you choose to simulate the hardware designs - see the note below.
+A SystemVerilog simulator  - neither design was run through a simulator in this submission
+
+## Quick start
+
+```bash
+./src/nbody/script_nbody.sh      # runs and measures all 4 nbody variants + flame graphs
+./src/pyflate/script_pyflate.sh  # runs and measures all 3 pyflate variants + flame graphs
+```
+
+Each script installs its own dependencies, runs `pyperf system tune`,
+measures every variant with `pyperf compare_to`, and regenerates the flame
+graphs. Run `python -m pyperf system reset` afterward to undo the system
+tuning.
 
 ## Benchmark 1: nbody
 
 **Source**: pyperformance's `bm_nbody` - 5-body solar-system gravity
 simulation, 20,000 iterations, pure Python in the original.
-
-### Software - how to run each version
-
-```bash
-cd src/nbody/software
-python nbody_original.py -o ../../../results/nbody/baseline.json --values 15 --loops 4
-python nbody_unrolled.py -o ../../../results/nbody/unrolled.json --values 15 --loops 4
-python nbody_unrolled_sqrt.py -o ../../../results/nbody/v2_sqrt.json --values 15 --loops 4
-python nbody_numba.py -o ../../../results/nbody/numba.json --values 15 --loops 4   # requires numba
-
-python -m pyperf compare_to results/nbody/baseline.json results/nbody/<variant>.json
-```
-
-Single-process perf stat comparison (bypasses pyperf's multi-worker
-process spawning, which otherwise double-counts numba's JIT compilation
-once per worker - see Methodology notes below):
-```bash
-perf stat -e cache-references,cache-misses,cycles,instructions python perf_wrapper_baseline.py
-perf stat -e cache-references,cache-misses,cycles,instructions python perf_wrapper_numba.py
-```
 
 ### Software results
 
@@ -101,7 +98,8 @@ perf stat -e cache-references,cache-misses,cycles,instructions python perf_wrapp
 | 3. Numba JIT (`@njit`, NumPy arrays) | 9.24 ms +/- 0.12 ms | **24.82-24.95x faster** |
 
 All optimizations verified correct against the original's `report_energy()`
-output (differences of 0.0 or floating-point rounding noise only).
+output (differences of 0.0 or floating-point rounding noise only). Full
+analysis, flame graphs, and discussion in `results/nbody/report_nbody_final.pdf`.
 
 ### Hardware
 
@@ -109,42 +107,22 @@ output (differences of 0.0 or floating-point rounding noise only).
 drives `nbody_datapath.sv` through all 10 body-pair force computations and
 the position-update step, autonomously repeating for the full iteration
 count once started. Arithmetic is 64-bit IEEE-754 double, expressed
-behaviorally via SystemVerilog `real`/`$sqrt`/`$bitstoreal` (a simulation-only
-stand-in for synthesizable floating-point IP blocks - see
-`results/nbody/report_nbody.txt` Section 5 for the full design description
-and the precision/area/throughput trade-offs this implies).
+behaviorally via SystemVerilog `real`/`$sqrt`/`$bitstoreal` (a
+simulation-only stand-in for synthesizable floating-point IP blocks).
 
-**Status: this design has not been run through a simulator in this
-submission.** It is presented as a logically-consistent architectural
-description, per the assignment's note that synthesis, fabrication, and
-physical testing are not expected.
+**Status: not run through a simulator in this submission.** Presented as
+a logically-consistent architectural description.
 
 ## Benchmark 2: pyflate
 
 **Source**: pyperformance's `bm_pyflate` - pure-Python bzip2/gzip
 decompressor (Paul Sladen, 2006-2007), decompressing `data/interpreter.tar.bz2`.
 
-### Software - how to run each version
-
-```bash
-cd src/pyflate/software
-python pyflate_original.py -o ../../../results/pyflate/baseline.json --loops 1 --values 15
-python pyflate_lookup.py -o ../../../results/pyflate/v1_lookup.json --loops 1 --values 15
-python pyflate_v2_lookup_mtf.py -o ../../../results/pyflate/v2_lookup_mtf.json --loops 1 --values 15
-
-python -m pyperf compare_to results/pyflate/baseline.json results/pyflate/<variant>.json
-```
-
-Profiling (bypasses pyperf's multi-process runner - see Methodology notes):
-```bash
-python cprofile_wrapper_baseline.py
-```
-
 ### Software results
 
 cProfile on the baseline showed `find_next_symbol()` (Huffman symbol
-decode) responsible for ~49.6% of total runtime - a linear scan over
-the entire Huffman table for every symbol decoded.
+decode) responsible for ~49.6% of total runtime - a linear scan over the
+entire Huffman table for every symbol decoded.
 
 | Optimization | Result | Verdict |
 |---|---|---|
@@ -154,85 +132,23 @@ the entire Huffman table for every symbol decoded.
 
 Both optimized versions verified byte-identical to the original on a
 reference bzip2 stream, and pass the benchmark's own internal MD5 check
-against the real input file.
+against the real input file. Full analysis, flame graphs, and discussion
+in `results/pyflate/report_pyflate.docx`.
 
 ### Hardware
 
 `src/pyflate/hardware/`: a 9-state FSM (`pyflate_controller.sv`) drives
-`pyflate_datapath.sv`, which shifts in one input bit at a time into
-`code_value`/`code_length`, and wires two hardware realizations of the
-two software optimizations above:
+`pyflate_datapath.sv`, which shifts in one input bit at a time, and wires
+two hardware realizations of the two software optimizations above:
 - `huffman_lookup.sv` - a parallel, CAM-style symbol match against up to
   512 table entries simultaneously (single-cycle O(1) latency), the
   hardware counterpart of the software's dict-based lookup.
 - `move_to_front.sv` - a single-cycle, 256-entry list shift, the hardware
   counterpart of the software's `pop`/`insert` fix.
 
-`pyflate_mmio.sv` exposes three memory-mapped registers
-(`CONTROL` 0x000, `STATUS` 0x008, `OUTPUT` 0x010) for `start`/`init_mtf`,
-`busy`/`done`/`decoded_valid`, and the decoded symbol byte. Table entries
-and input bits are loaded through separate, direct ports
-(`load_table_entry`+fields, `input_bit`+`input_valid`) - one entry/bit at a
-time, not via DMA or a memory interface.
 
-A timing bug was found and fixed during design review: the bit
-shift-in logic was originally gated on `load_bit && input_valid`, but the
-controller asserts `load_bit` one clock cycle after observing
-`input_valid`, which by then has typically already fallen (a single-cycle
-pulse) - so the bit was silently never latched. Fixed by gating on
-`load_bit` alone, since the controller's FSM is already the single source
-of truth for when a bit is valid to consume.
+**Status: not run through a simulator in this submission.** Presented as
+a logically-consistent architectural description.
 
-**Status: this design has not been run through a simulator in this
-submission.** Presented as a logically-consistent architectural
-description, per the assignment's note that synthesis, fabrication, and
-physical testing are not expected.
 
-**Known limitation (documented, not fixed)**: earlier draft block
-diagrams for this accelerator depicted a full memory-mapped DMA interface
-(address/size registers, autonomous reads of the Huffman table and
-compressed input from system memory, autonomous output writes) - the
-actual RTL does not implement this; table entries and input bits must be
-fed individually by the host through direct ports, and `pyflate_mmio.sv`
-only implements the three registers listed above. This is a real
-throughput limitation of the current design (many host-accelerator
-handshakes per decoded symbol) and a candidate for future extension, not
-merely a documentation gap to paper over.
 
-## Methodology notes that apply to both benchmarks
-
-- Always measure with `pyperf compare_to`, never eyeball means; run
-  `python -m pyperf system tune` before measuring for stability (and
-  `system reset` afterward when done).
-- Avoid `--fast` for anything but a quick sanity check - it produces
-  unstable results (pyperf's own stability warning fires reliably with it).
-- When profiling or `perf stat`-ing code that runs through
-  `pyperf.Runner` (which spawns worker subprocesses), measure the actual
-  function directly in a single process instead (see
-  `perf_wrapper_*.py` / `cprofile_wrapper_baseline.py`) - otherwise the
-  measurement captures parent-process IPC/subprocess-spawn overhead (or,
-  for JIT-compiled code, repeated compilation once per worker process)
-  rather than the benchmark's real steady-state work.
-- For JIT-compiled code (numba), trigger compilation with a warm-up call
-  before the timed region - otherwise the first measured call includes
-  one-time compilation latency and misrepresents steady-state speed.
-- Every optimized software version in this repository was independently
-  verified for correctness against the original's output before being
-  accepted as a result (see each benchmark's software results above).
-
-## AI tool usage
-
-Prompts and instructions used with AI tools during this project are to be
-documented in `prompt.txt`, per submission requirements.
-**TODO: not yet completed.**
-
-## Status / TODO
-
-- [x] nbody: 3 software optimizations measured, verified, and documented
-- [x] nbody: hardware accelerator designed (SystemVerilog, not simulated)
-- [x] nbody: `report_nbody.txt` complete
-- [x] pyflate: 2 software optimizations measured, verified, and documented; 7% target exceeded
-- [x] pyflate: hardware accelerator designed (SystemVerilog, not simulated), one timing bug found and fixed
-- [ ] pyflate: `report_pyflate.txt`
-- [ ] `prompt.txt` (AI tool usage documentation, both benchmarks)
-- [ ] Presentation
